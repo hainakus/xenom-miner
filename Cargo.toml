@@ -49,8 +49,9 @@ nix = "0.25"
 hex = "0.4"
 semver = "1.0"
 time = { version = "0.3", features = ["formatting", "macros"] }
-blake3 = "1.5.0"
-
+blake3 = "1.5.4"
+wasm-bindgen = "0.2.94"
+faster-hex = "0.10.0"
 [features]
 default = ["parking_lot"]
 parking_lot = ["parking", "tokio/parking_lot"]
@@ -61,7 +62,10 @@ no-asm = ["keccak"]
 keccak = "0.1"
 kernel32-sys = "0.2"
 win32console = "0.1"
-
+kaspa-utils = "0.15.0"
+kaspa-consensus-core = "0.15.0"
+kaspa-hashes = "0.15.0"
+kaspa-math = "0.15.0"
 [profile.release]
 lto = true
 codegen-units = 1

@@ -1,4 +1,4 @@
-use crate::pow::{hasher::HeavyHasher, xoshiro::XoShiRo256PlusPlus};
+use crate::pow::{hasher::KHeavyHash, xoshiro::XoShiRo256PlusPlus};
 use crate::Hash;
 use std::mem::MaybeUninit;
 
@@ -122,7 +122,7 @@ impl Matrix {
 
         // Concatenate 4 LSBs back to 8 bit xor with sum1
         product.iter_mut().zip(hash).for_each(|(p, h)| *p ^= h);
-        HeavyHasher::hash(Hash::from_le_bytes(product))
+        KHeavyHash::hash(Hash::from_le_bytes(product))
     }
 }
 

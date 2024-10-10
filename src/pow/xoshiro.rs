@@ -1,5 +1,7 @@
-use crate::Hash;
+
 use std::num::Wrapping;
+use crate::Hash;
+
 
 pub(super) struct XoShiRo256PlusPlus {
     s0: Wrapping<u64>,
@@ -11,7 +13,7 @@ pub(super) struct XoShiRo256PlusPlus {
 impl XoShiRo256PlusPlus {
     #[inline]
     pub(super) fn new(hash: Hash) -> Self {
-        Self { s0: Wrapping(hash.0[0]), s1: Wrapping(hash.0[1]), s2: Wrapping(hash.0[2]), s3: Wrapping(hash.0[3]) }
+        Self { s0: Wrapping(hash.0[0] as u64), s1: Wrapping(hash.0[1] as u64), s2: Wrapping(hash.0[2] as u64), s3: Wrapping(hash.0[3] as u64) }
     }
 
     #[inline]
