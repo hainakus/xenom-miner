@@ -1,42 +1,27 @@
-
-
-use std::cmp::max;
-
-use kaspa_consensus_core::{hashing, header::Header, BlockLevel};
-use kaspa_hashes::PowHash;
-use kaspa_math::Uint256;
-
-const BLOCK_HASH_DOMAIN: &[u8] = b"BlockHash";
+use kaspa_hashes::Hash;
 
 #[derive(Clone)]
-pub(super) struct PowHasher(blake3::Hasher);
-
-#[derive(Clone, Copy)]
-pub(super) struct KHeavyHash;
+pub struct PowHash(blake3::Hasher);
 
 #[derive(Clone)]
-pub struct HeaderHasher(Blake3Hasher);
+pub struct KHeavyHash;
 
-impl PowHasher {
-    // The initial state of `cSHAKE256("ProofOfWorkHash")`
-    // [10] -> 1123092876221303310 ^ 0x04(padding byte) = 1123092876221303306
-    // [16] -> 10306167911662716186 ^ 0x8000000000000000(final padding) = 1082795874807940378
+impl PowHash {
     #[inline]
     pub fn new(pre_pow_hash: Hash, timestamp: u64) -> Self {
-        let pre_pow_hash = hashing::header::hash_override_nonce_time(header, 0, 0);
-        // PRE_POW_HASH || TIME || 32 zero byte padding || NONCE
-        let hasher = PowHash::new(pre_pow_hash, header.timestamp);
-        let matrix = Matrix::generate(pre_pow_hash);
-
-        Self { matrix, target, hasher }
+        let mut hasher = blake3::Hasher::new();
+        hasher.update(&pre_pow_hash.inner());
+        hasher.update(&timestamp.to_le_bytes());
+        hasher.update(&[0u8; 32]);
+        Self (hasher)
     }
 
     #[inline(always)]
-    pub fn finalize_with_nonce(&mut self, nonce: u64) -> Uint256 {
-        // Hasher already contains PRE_POW_HASH || TIME || 32 zero byte padding; so only the NONCE is missing
-        let hash = self.hasher.clone().finalize_with_nonce(nonce);
-        let hash = self.matrix.heavy_hash(hash);
-        Uint256::from_le_bytes(hash.as_bytes())
+    pub fn finalize_with_nonce(&mut self, nonce: u64) -> Hash {
+        self.0.update(&nonce.to_le_bytes());
+        let mut hash_bytes = [0u8; 32];
+        self.0.finalize_xof().fill(&mut hash_bytes);
+        Hash::from_bytes(hash_bytes)
     }
 }
 
@@ -44,7 +29,7 @@ impl KHeavyHash {
     #[inline]
     pub fn hash(in_hash: Hash) -> Hash {
 
-        let bytes: &[u8; 32] = &in_hash.0;
+        let bytes: &[u8] = &in_hash.inner();
         let mut hasher = blake3::Hasher::new();
         hasher.update(bytes);
 
@@ -54,48 +39,12 @@ impl KHeavyHash {
     }
 }
 
-impl HeaderHasher {
-    #[inline(always)]
-    pub fn new() -> Self {
-        let mut key = [42u8; 32];
-        key = [66, 108, 111, 99, 107, 72, 97, 115, 104, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0];
-        let mut hasher = Blake3Hasher::new_keyed(&key);
-        Self(hasher)
-    }
-
-    pub fn write<A: AsRef<[u8]>>(&mut self, data: A) {
-        self.0.update(data.as_ref());
-    }
-
-    #[inline(always)]
-    pub fn finalize(self) -> Hash {
-        Hash::from_le_bytes(self.0.finalize().as_bytes().clone().try_into().expect("this is 32 bytes"))
-    }
-}
-
-pub trait Hasher {
-    fn update<A: AsRef<[u8]>>(&mut self, data: A) -> &mut Self;
-}
-
-impl Hasher for HeaderHasher {
-    fn update<A: AsRef<[u8]>>(&mut self, data: A) -> &mut Self {
-        self.write(data);
-        self
-    }
-}
-
 #[cfg(test)]
 mod tests {
-    use std::io::Write;
-    use crate::pow::hasher::{ KHeavyHash, PowHasher};
+    use kaspa_hashes::Hash;
 
-    use sha3::digest::{ExtendableOutput, Update, XofReader};
-    use sha3::CShake256;
-    use crate::Hash;
-    use crate::pow::xoshiro::Hash;
 
-    const PROOF_OF_WORK_DOMAIN: &[u8] = b"ProofOfWorkHash";
-    const HEAVY_HASH_DOMAIN: &[u8] = b"HeavyHash";
+    use super::PowHash;
 
     #[test]
     fn test_pow_hash() {
@@ -104,13 +53,13 @@ mod tests {
         let pre_pow_hash = Hash::from_bytes([
             99, 231, 29, 85, 153, 225, 235, 207, 36, 237, 3, 55, 106, 21, 221, 122, 28, 51, 249, 76, 190, 128, 153, 244, 189, 104, 26, 178, 170, 4, 177, 103
         ]);
-        let mut hasher = PowHasher::new(pre_pow_hash, timestamp);
+        let mut hasher = PowHash::new(pre_pow_hash, timestamp);
         let hash1 = hasher.finalize_with_nonce(nonce);
 
 
         let mut hasher = blake3::Hasher::new();
         hasher
-            .update(&pre_pow_hash.0)
+            .update(&pre_pow_hash.inner())
             .update(&timestamp.to_le_bytes())
             .update(&[0u8; 32])
             .update(&nonce.to_le_bytes());
@@ -122,17 +71,25 @@ mod tests {
 
     #[test]
     fn test_heavy_hash() {
-        let val = Hash::from_le_bytes([42; 32]);
-        let hash1 = KHeavyHash::hash(val);
+        let timestamp: u64 = 1715521488610;
+        let nonce: u64 = 11171827086635415026;
+        let pre_pow_hash = Hash([42; 32]);
 
         let mut hasher = blake3::Hasher::new();
-        let bytes = unsafe { std::mem::transmute(val.to_le_bytes()) };
-        hasher.write(bytes);
+        hasher
+            .update(&pre_pow_hash.inner())
+            .update(&timestamp.to_le_bytes())
+            .update(&[0u8; 32])
+            .update(&nonce.to_le_bytes());
 
-        let mut hash2 = [0u8; 32];
-        hasher.finalize_xof().fill(&mut hash2);
-        assert_eq!(Hash::from_le_bytes(hash2), hash1);
+        let mut hash1 = [0u8; 32];
+        hasher.finalize_xof().fill(&mut hash1);
+
+        let hash2 = Hash::from_bytes([
+            0xe3, 0x69, 0xd9, 0xa9, 0xab, 0x79, 0x36, 0x22, 0xe8, 0xfc, 0x83, 0xb6, 0xbc, 0xb5,
+            0x40, 0xf5, 0x53, 0x51, 0x0c, 0x8a, 0xdf, 0x5b, 0x9b, 0x99, 0x64, 0x98, 0x2e, 0x83,
+            0x48, 0x11, 0x76, 0x26
+        ]);
+        assert_eq!(hash2, Hash(hash1));
     }
 }
-
-
