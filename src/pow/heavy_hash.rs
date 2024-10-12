@@ -1,6 +1,7 @@
-use crate::pow::{hasher::KHeavyHash, xoshiro::XoShiRo256PlusPlus};
+use crate::pow::{ xoshiro::XoShiRo256PlusPlus};
 use crate::Hash;
 use std::mem::MaybeUninit;
+use kaspa_hashes::KHeavyHash;
 
 #[derive(Debug, Ord, PartialOrd, Eq, PartialEq)]
 pub struct Matrix(pub [[u16; 64]; 64]);

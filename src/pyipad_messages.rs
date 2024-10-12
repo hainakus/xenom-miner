@@ -1,11 +1,11 @@
+use kaspa_hashes::Hash;
+use crate::pow;
+use crate::pow::hasher::HeaderHasher;
 use crate::proto::{
     pyipad_message::Payload, GetBlockTemplateRequestMessage, GetInfoRequestMessage, PyipadMessage,
     NotifyBlockAddedRequestMessage, NotifyNewBlockTemplateRequestMessage, RpcBlock, SubmitBlockRequestMessage,
 };
-use crate::{
-    pow::{self, HeaderHasher},
-    Hash,
-};
+
 
 impl PyipadMessage {
     #[inline(always)]
@@ -50,6 +50,7 @@ impl From<NotifyNewBlockTemplateRequestMessage> for PyipadMessage {
         PyipadMessage { payload: Some(Payload::NotifyNewBlockTemplateRequest(a)) }
     }
 }
+
 
 impl RpcBlock {
     #[inline(always)]

@@ -1,3 +1,5 @@
+use crate::pow::keccak;
+
 #[cfg(any(not(target_arch = "x86_64"), feature = "no-asm", target_os = "windows"))]
 pub(super) fn f1600(state: &mut [u64; 25]) {
     keccak::f1600(state);
